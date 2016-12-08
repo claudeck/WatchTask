@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.nio.file.StandardWatchEventKinds.*;
 
@@ -24,14 +23,14 @@ public class WatchTask extends Task {
         private ShutdownTask(Thread antThread) {
             this.antThread = antThread;
             this.shutdownThread = new Thread(this);
-            Runtime.getRuntime().addShutdownHook( shutdownThread );
+            Runtime.getRuntime().addShutdownHook(shutdownThread);
         }
 
         public void run() {
             try {
                 log("Shut down received...");
                 antThread.interrupt();
-                synchronized ( this ) {
+                synchronized (this) {
                     this.wait();
                 }
                 log("done");
@@ -47,42 +46,42 @@ public class WatchTask extends Task {
         try {
             watcher = FileSystems.getDefault().newWatchService();
 
-            for( WatchedTarget watch : targets ) {
-                watch.startWatching( getProject(), watcher );
+            for (WatchedTarget watch : targets) {
+                watch.startWatching(getProject(), watcher);
             }
 
-            while(true) {
+            while (true) {
                 WatchKey key = watcher.take();
-                for( WatchEvent<?> event : key.pollEvents() ) {
+                for (WatchEvent<?> event : key.pollEvents()) {
                     WatchEvent.Kind kind = event.kind();
-                    if( kind != OVERFLOW ) {
-                        for( WatchedTarget target : targets ) {
-                            if( target.watching( key ) ) {
-                                Path pathToEvent = target.resolve( key, (Path)event.context() );
-                                if( Files.isDirectory(pathToEvent, LinkOption.NOFOLLOW_LINKS)) {
-                                    if( event.kind() == ENTRY_CREATE ) {
-                                        log( "Start watching: " + pathToEvent );
-                                        target.addWatch( pathToEvent, watcher );
-                                    } else if( event.kind() == ENTRY_DELETE ) {
-                                        log( "Stop watching: " + pathToEvent );
-                                        target.removeWatch( key );
+                    if (kind != OVERFLOW) {
+                        for (WatchedTarget target : targets) {
+                            if (target.watching(key)) {
+                                Path pathToEvent = target.resolve(key, (Path) event.context());
+                                if (Files.isDirectory(pathToEvent, LinkOption.NOFOLLOW_LINKS)) {
+                                    if (event.kind() == ENTRY_CREATE) {
+                                        log("Start watching: " + pathToEvent);
+                                        target.addWatch(pathToEvent, watcher);
+                                    } else if (event.kind() == ENTRY_DELETE) {
+                                        log("Stop watching: " + pathToEvent);
+                                        target.removeWatch(key);
                                     }
                                 }
-                                target.execute( getProject(), (WatchEvent<Path>)event );
+                                target.execute(getProject(), pathToEvent, this);
                             }
                         }
                     }
                 }
-                if( !key.reset() ) {
-                    log( key.toString() + " could not be reset!");
+                if (!key.reset()) {
+                    log(key.toString() + " could not be reset!");
                 }
             }
         } catch (IOException e) {
             throw new BuildException("IO Exception", e);
-        } catch( InterruptedException e ) {
+        } catch (InterruptedException e) {
             // todo shutting down
         } finally {
-            for( WatchedTarget watch : targets ) {
+            for (WatchedTarget watch : targets) {
                 watch.stopWatching(watcher);
             }
             synchronized (shutdown) {
@@ -91,8 +90,8 @@ public class WatchTask extends Task {
         }
     }
 
-    public void addWhen( WatchedTarget watching ) {
-        if( targets == null ) targets = new ArrayList<WatchedTarget>();
-        targets.add( watching );
+    public void addWhen(WatchedTarget watching) {
+        if (targets == null) targets = new ArrayList<WatchedTarget>();
+        targets.add(watching);
     }
 }
